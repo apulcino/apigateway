@@ -1,9 +1,12 @@
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 const constantes = require('../library/constantes');
-var http = require('http');
+const multicastRecver = require('../library/multicastRecver');
+const http = require('http');
 const express = require('express');
 const router = express.Router();
+
+let AFORegisteryUrl = [];
 
 //------------------------------------------------------------------------------
 // http://localhost:8080/afpforum
@@ -21,6 +24,7 @@ router.use((req, res, next) => {
 })
 
 //------------------------------------------------------------------------------
+// Vérifier si l'API invoquée est connue
 //------------------------------------------------------------------------------
 reRouteAPICall = function (req) {
     console.log('reRouteAPICall : ', req.url)
@@ -28,6 +32,7 @@ reRouteAPICall = function (req) {
     return constantes.findActiveMService(MServiceList, req.url);
 }
 //------------------------------------------------------------------------------
+// forwarder la requête vers le serveur qui l'héberge
 //------------------------------------------------------------------------------
 reSendRequest = function (request, response, Srv) {
     var proxy = http.createClient(Srv.port, Srv.host)
@@ -50,13 +55,27 @@ reSendRequest = function (request, response, Srv) {
 }
 
 //------------------------------------------------------------------------------
+// Demander à la Registry la liste des services disponibles
 //------------------------------------------------------------------------------
 let MServiceList = [];
 constantes.getServiceList().then(data => { MServiceList = data; });
 const intervalObj = setInterval(() => {
-    constantes.getServiceList().then(data => {
-        MServiceList = data;
-    });
+    if (0 !== AFORegisteryUrl) {
+        constantes.getServiceList(AFORegisteryUrl).then(data => {
+            MServiceList = data;
+        });
+    }
 }, 10000);
+
+//------------------------------------------------------------------------------
+// Se mettre à l'écoute des messages internes
+//------------------------------------------------------------------------------
+const mcRecver = new multicastRecver(constantes.getServerIpAddress(), constantes.MCastAppPort, constantes.MCastAppAddr, (address, port, message) => {
+    console.log('APIGateway : MCast Msg: From: ' + address + ':' + port + ' - ' + JSON.stringify(message));
+    var regUrl = 'http://' + message.host + ':' + message.port;
+    if (-1 === AFORegisteryUrl.indexOf(regUrl)) {
+        AFORegisteryUrl.push(regUrl);
+    }
+});
 
 module.exports = router;
