@@ -1,24 +1,29 @@
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 const constantes = require('../library/constantes');
+const traceMgr = new (require('../library/tracemgr'))('APIGateway');
 const multicastRecver = require('../library/multicastRecver');
 const regsitryMgr = require('../library/registryMgr');
+
 const http = require('http');
 const express = require('express');
 const router = express.Router();
 
 let MServiceList = [];
 const regMgr = new regsitryMgr();
+const date = new Date();
 //------------------------------------------------------------------------------
 // http://localhost:8080/afpforum
 //------------------------------------------------------------------------------
 router.use((req, res, next) => {
     let Srv = reRouteAPICall(req);
     if (Srv) {
-        reSendRequest(req, res, Srv);
-        res.set('source', Srv.url);
+        var TRANSID = 'XAFP_' + date.getTime();
+        res.set('XAFP-TRANSID', TRANSID);
+        res.set('XAFP-SOURCE', Srv.url);
+        reSendRequest(req, res, Srv, TRANSID);
     } else {
-        res.set('source', 'Service_Unavailable');
+        res.set('XAFP-SOURCE', 'Service_Unavailable');
         res.status(400).json({
             isSuccess: false,
             message: 'api not available'
@@ -33,16 +38,18 @@ reRouteAPICall = function (req) {
     // destCompo : {"type":"3","url":"http://158.50.163.7:3000","pathname":"/api/user","status":true,"cptr":331}
     var destCompo = constantes.findActiveMService(MServiceList, req.url);
     if (destCompo) {
-        console.log('APIGateway : Route API call to : ', destCompo.url);
+        traceMgr.info('APIGateway : Route API call to : ', destCompo.url);
     }
     return destCompo;
 }
 //------------------------------------------------------------------------------
 // forwarder la requête vers le serveur qui l'héberge
 //------------------------------------------------------------------------------
-reSendRequest = function (request, response, Srv) {
+reSendRequest = function (request, response, Srv, TRANSID) {
+    var myHeaders = request.headers;
+    myHeaders['XAFP-TRANSID'] = TRANSID;
     var proxy = http.createClient(Srv.port, Srv.host)
-    var proxy_request = proxy.request(request.method, request.url, request.headers);
+    var proxy_request = proxy.request(request.method, request.url, myHeaders);
     proxy_request.addListener('response', function (proxy_response) {
         proxy_response.addListener('data', function (chunk) {
             response.write(chunk, 'binary');
@@ -146,16 +153,19 @@ const mcRecver = new multicastRecver(constantes.getServerIpAddress(), constantes
     switch (message.type) {
         // Annonce d'une registry présente sur le réseau
         case constantes.MSMessageTypeEnum.regAnnonce:
-            console.log('APIGateway : Recv Msg : regAnnonce');
+            traceMgr.debug('Recv Msg : regAnnonce');
             regMgr.add(message.host, message.port);
+            if (MServiceList.length === 0) {
+                findAvailableServices();
+            }
             break;
         // Annonce d'une mise à jour de registry
         case constantes.MSMessageTypeEnum.regUpdate:
-            console.log('APIGateway : Recv Msg : regUpdate');
+            traceMgr.info('Recv Msg : regUpdate');
             findAvailableServices();
             break;
         default:
-            console.log('APIGateway : Recv Msg From : ' + address + ':' + port + ' - ' + JSON.stringify(message));
+            traceMgr.warn('Recv Msg From : ' + address + ':' + port + ' - ' + JSON.stringify(message));
             break;
     }
 });
