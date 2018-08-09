@@ -16,7 +16,9 @@ router.use((req, res, next) => {
     let Srv = reRouteAPICall(req);
     if (Srv) {
         reSendRequest(req, res, Srv);
+        res.set('source', Srv.url);
     } else {
+        res.set('source', 'Service_Unavailable');
         res.status(400).json({
             isSuccess: false,
             message: 'api not available'
@@ -30,8 +32,10 @@ router.use((req, res, next) => {
 reRouteAPICall = function (req) {
     // destCompo : {"type":"3","url":"http://158.50.163.7:3000","pathname":"/api/user","status":true,"cptr":331}
     var destCompo = constantes.findActiveMService(MServiceList, req.url);
-    console.log('APIGateway : Route API call to : ', destCompo.url);
-    return destCompo
+    if (destCompo) {
+        console.log('APIGateway : Route API call to : ', destCompo.url);
+    }
+    return destCompo;
 }
 //------------------------------------------------------------------------------
 // forwarder la requête vers le serveur qui l'héberge
@@ -81,9 +85,9 @@ findAvailableServices = function () {
 // les 10 secondes
 //------------------------------------------------------------------------------
 findAvailableServices();
-const intervalObj = setInterval(() => {
-    findAvailableServices();
-}, 10000);
+// const intervalObj = setInterval(() => {
+//     findAvailableServices();
+// }, 10000);
 
 //------------------------------------------------------------------------------
 // Synchroniser la nelle liste de composants (newList) avec la courante MServiceList
@@ -139,9 +143,20 @@ SynchronizeComponentsList = function (newList) {
 // Se mettre à l'écoute des messages internes
 //------------------------------------------------------------------------------
 const mcRecver = new multicastRecver(constantes.getServerIpAddress(), constantes.MCastAppPort, constantes.MCastAppAddr, (address, port, message) => {
-    console.log('APIGateway : Recv Msg From : ' + address + ':' + port + ' - ' + JSON.stringify(message));
-    if (message.type === constantes.MSMessageTypeEnum.regAnnonce) {
-        regMgr.add(message.host, message.port);
+    switch (message.type) {
+        // Annonce d'une registry présente sur le réseau
+        case constantes.MSMessageTypeEnum.regAnnonce:
+            console.log('APIGateway : Recv Msg : regAnnonce');
+            regMgr.add(message.host, message.port);
+            break;
+        // Annonce d'une mise à jour de registry
+        case constantes.MSMessageTypeEnum.regUpdate:
+            console.log('APIGateway : Recv Msg : regUpdate');
+            findAvailableServices();
+            break;
+        default:
+            console.log('APIGateway : Recv Msg From : ' + address + ':' + port + ' - ' + JSON.stringify(message));
+            break;
     }
 });
 
