@@ -16,18 +16,26 @@ let date = (new Date()).getTime();
 // http://localhost:8080/afpforum
 //------------------------------------------------------------------------------
 router.use((req, res, next) => {
-    date += 1;
-    let Srv = reRouteAPICall(req);
-    if (Srv) {
-        var TRANSID = 'XAFP_' + date;
-        res.set('XAFP-TRANSID', TRANSID);
-        res.set('XAFP-SOURCE', Srv.url);
-        reSendRequest(req, res, Srv, TRANSID);
-    } else {
+    try {
+        date += 1;
+        let Srv = reRouteAPICall(req);
+        if (Srv) {
+            var TRANSID = 'XAFP_' + date;
+            res.set('XAFP-TRANSID', TRANSID);
+            res.set('XAFP-SOURCE', Srv.url);
+            reSendRequest(req, res, Srv, TRANSID);
+        } else {
+            res.set('XAFP-SOURCE', 'Service_Unavailable');
+            res.status(400).json({
+                isSuccess: false,
+                message: 'api not available'
+            });
+        }
+    } catch (err) {
         res.set('XAFP-SOURCE', 'Service_Unavailable');
         res.status(400).json({
             isSuccess: false,
-            message: 'api not available'
+            message: err.message
         });
     }
 })
@@ -39,7 +47,7 @@ reRouteAPICall = function (req) {
     // destCompo : {"type":"3","url":"http://158.50.163.7:3000","pathname":"/api/user","status":true,"cptr":331}
     var destCompo = constantes.findActiveMService(MServiceList, req.url);
     if (destCompo) {
-        traceMgr.info('APIGateway : Route API call to : ', destCompo.url);
+        traceMgr.info('Route API call to : ', destCompo.url);
     }
     return destCompo;
 }
@@ -50,6 +58,10 @@ reSendRequest = function (request, response, Srv, TRANSID) {
     var myHeaders = request.headers;
     myHeaders['XAFP-TRANSID'] = TRANSID;
     var proxy = http.createClient(Srv.port, Srv.host)
+    proxy.on('error', function (err) {
+        // Handle error
+        traceMgr.error('Route API call : ', err.message);
+    });
     var proxy_request = proxy.request(request.method, request.url, myHeaders);
     proxy_request.addListener('response', function (proxy_response) {
         proxy_response.addListener('data', function (chunk) {
