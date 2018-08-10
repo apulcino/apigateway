@@ -9,22 +9,39 @@ const http = require('http');
 const express = require('express');
 const router = express.Router();
 
-let MServiceList = [];
 const regMgr = new regsitryMgr(traceMgr);
 let date = (new Date()).getTime();
+// Liste des composant disponible sur le réseau
+let MServiceList = [];
+//------------------------------------------------------------------------------
+// Traitement des demandes vers AFPForum...
 //------------------------------------------------------------------------------
 // http://localhost:8080/afpforum
 //------------------------------------------------------------------------------
 router.use((req, res, next) => {
     try {
         date += 1;
+        // Rechercher le composant qui peut répondre à la demande
         let Srv = reRouteAPICall(req);
         if (Srv) {
+            // Ajouter les headers
             var TRANSID = 'XAFP_' + date;
             res.set('XAFP-TRANSID', TRANSID);
             res.set('XAFP-SOURCE', Srv.url);
-            reSendRequest(req, res, Srv, TRANSID);
+            // PRoxification de la dermande
+            reSendRequest(req, res, Srv, TRANSID,
+                null,
+                (err) => {
+                    // Le composant visé ne répond pas...
+                    res.set('XAFP-SOURCE', 'Service_Unavailable');
+                    res.status(500).json({
+                        isSuccess: false,
+                        message: err.message
+                    });
+                    removeComponentFromList(Srv);
+                });
         } else {
+            // Aucun composant ne sait traiter cette demande
             res.set('XAFP-SOURCE', 'Service_Unavailable');
             res.status(400).json({
                 isSuccess: false,
@@ -32,6 +49,7 @@ router.use((req, res, next) => {
             });
         }
     } catch (err) {
+        // Problème lors du traitement de la demande
         res.set('XAFP-SOURCE', 'Service_Unavailable');
         res.status(400).json({
             isSuccess: false,
@@ -41,7 +59,7 @@ router.use((req, res, next) => {
 })
 
 //------------------------------------------------------------------------------
-// Vérifier si l'API invoquée est connue
+// Vérifier si l'API invoquée est traité par un composant
 //------------------------------------------------------------------------------
 reRouteAPICall = function (req) {
     // destCompo : {"type":"3","url":"http://158.50.163.7:3000","pathname":"/api/user","status":true,"cptr":331}
@@ -52,15 +70,17 @@ reRouteAPICall = function (req) {
     return destCompo;
 }
 //------------------------------------------------------------------------------
-// forwarder la requête vers le serveur qui l'héberge
+// forwarder la requête vers le serveur qui héberge le composant
 //------------------------------------------------------------------------------
-reSendRequest = function (request, response, Srv, TRANSID) {
+reSendRequest = function (request, response, Srv, TRANSID, successCB, errorCB) {
+    successCB = successCB || function () { };
+    errorCB = errorCB || function () { };
     var myHeaders = request.headers;
     myHeaders['XAFP-TRANSID'] = TRANSID;
     var proxy = http.createClient(Srv.port, Srv.host)
     proxy.on('error', function (err) {
         // Handle error
-        traceMgr.error('Route API call : ', err.message);
+        errorCB(err);
     });
     var proxy_request = proxy.request(request.method, request.url, myHeaders);
     proxy_request.addListener('response', function (proxy_response) {
@@ -92,7 +112,7 @@ findAvailableServices = function () {
     if (0 !== AFORegisteryUrlList.length) {
         // returns a random integer from 0 to AFORegisteryUrlList.length - 1
         let idx = Math.floor(Math.random() * AFORegisteryUrlList.length);
-        // Demander au 1er annuaire de la liste
+        // Demander a l'un des annuaires de la liste des composant disponibles sur le réseau
         constantes.getServiceList(traceMgr, AFORegisteryUrlList[idx]).then(data => {
             // Réception de la nouvelle liste de composants
             SynchronizeComponentsList(data);
@@ -111,6 +131,21 @@ const intervalObj = setInterval(() => {
     regMgr.checkRegistryStatus();
 }, 30000);
 
+//------------------------------------------------------------------------------
+// Supprimer le composant indiqué
+//------------------------------------------------------------------------------
+removeComponentFromList = function (Srv) {
+    MServiceList = MServiceList || [];
+    let idx = MServiceList.findIndex((item) => {
+        return (item.url === Srv.url);
+    });
+    if (-1 !== idx) {
+        MServiceList.splice(idx, 1);
+    }
+    if (0 === MServiceList.length) {
+        traceMgr.error('No component available');
+    }
+}
 //------------------------------------------------------------------------------
 // Synchroniser la nelle liste de composants (newList) avec la courante MServiceList
 // newList = [
