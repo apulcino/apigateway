@@ -10,15 +10,16 @@ const express = require('express');
 const router = express.Router();
 
 let MServiceList = [];
-const regMgr = new regsitryMgr();
-const date = new Date();
+const regMgr = new regsitryMgr(traceMgr);
+let date = (new Date()).getTime();
 //------------------------------------------------------------------------------
 // http://localhost:8080/afpforum
 //------------------------------------------------------------------------------
 router.use((req, res, next) => {
+    date += 1;
     let Srv = reRouteAPICall(req);
     if (Srv) {
-        var TRANSID = 'XAFP_' + date.getTime();
+        var TRANSID = 'XAFP_' + date;
         res.set('XAFP-TRANSID', TRANSID);
         res.set('XAFP-SOURCE', Srv.url);
         reSendRequest(req, res, Srv, TRANSID);
@@ -77,8 +78,10 @@ findAvailableServices = function () {
     // Demander la liste des annuaires connus
     let AFORegisteryUrlList = regMgr.getList();
     if (0 !== AFORegisteryUrlList.length) {
+        // returns a random integer from 0 to AFORegisteryUrlList.length - 1
+        let idx = Math.floor(Math.random() * AFORegisteryUrlList.length);
         // Demander au 1er annuaire de la liste
-        constantes.getServiceList('APIGateway', AFORegisteryUrlList[0]).then(data => {
+        constantes.getServiceList(traceMgr, AFORegisteryUrlList[idx]).then(data => {
             // Réception de la nouvelle liste de composants
             SynchronizeComponentsList(data);
         }).catch((AFORegisteryUrlWithError) => {
@@ -92,9 +95,9 @@ findAvailableServices = function () {
 // les 10 secondes
 //------------------------------------------------------------------------------
 findAvailableServices();
-// const intervalObj = setInterval(() => {
-//     findAvailableServices();
-// }, 10000);
+const intervalObj = setInterval(() => {
+    regMgr.checkRegistryStatus();
+}, 30000);
 
 //------------------------------------------------------------------------------
 // Synchroniser la nelle liste de composants (newList) avec la courante MServiceList
@@ -153,7 +156,7 @@ const mcRecver = new multicastRecver(constantes.getServerIpAddress(), constantes
     switch (message.type) {
         // Annonce d'une registry présente sur le réseau
         case constantes.MSMessageTypeEnum.regAnnonce:
-            traceMgr.debug('Recv Msg : regAnnonce');
+            traceMgr.debug('Recv Msg : regAnnonce : ', JSON.stringify(message));
             regMgr.add(message.host, message.port);
             if (MServiceList.length === 0) {
                 findAvailableServices();
