@@ -1,3 +1,4 @@
+"use strict"
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 const constantes = require('../library/constantes');
@@ -61,7 +62,7 @@ router.use((req, res, next) => {
 //------------------------------------------------------------------------------
 // Vérifier si l'API invoquée est traité par un composant
 //------------------------------------------------------------------------------
-reRouteAPICall = function (req) {
+const reRouteAPICall = function (req) {
     // destCompo : {"type":"3","url":"http://158.50.163.7:3000","pathname":"/api/user","status":true,"cptr":331}
     var destCompo = constantes.findActiveMService(MServiceList, req.url);
     if (destCompo) {
@@ -72,7 +73,7 @@ reRouteAPICall = function (req) {
 //------------------------------------------------------------------------------
 // forwarder la requête vers le serveur qui héberge le composant
 //------------------------------------------------------------------------------
-reSendRequest = function (request, response, Srv, TRANSID, successCB, errorCB) {
+const reSendRequest = function (request, response, Srv, TRANSID, successCB, errorCB) {
     successCB = successCB || function () { };
     errorCB = errorCB || function () { };
     var myHeaders = request.headers;
@@ -106,7 +107,7 @@ reSendRequest = function (request, response, Srv, TRANSID, successCB, errorCB) {
 //------------------------------------------------------------------------------
 // Faire une Mise à jour de la liste des services
 //------------------------------------------------------------------------------
-findAvailableServices = function () {
+const findAvailableServices = function () {
     // Demander la liste des annuaires connus
     let AFORegisteryUrlList = regMgr.getList();
     if (0 !== AFORegisteryUrlList.length) {
@@ -134,7 +135,7 @@ const intervalObj = setInterval(() => {
 //------------------------------------------------------------------------------
 // Supprimer le composant indiqué
 //------------------------------------------------------------------------------
-removeComponentFromList = function (Srv) {
+const removeComponentFromList = function (Srv) {
     MServiceList = MServiceList || [];
     let idx = MServiceList.findIndex((item) => {
         return (item.url === Srv.url);
@@ -153,7 +154,7 @@ removeComponentFromList = function (Srv) {
 //     {"type":"1","url":"http://158.50.163.7:63715","host":"158.50.163.7","port":"63715","pathname":"/api/events","status":true,"cptr":385}
 // ]
 //------------------------------------------------------------------------------
-SynchronizeComponentsList = function (newList) {
+const SynchronizeComponentsList = function (newList) {
     newList = newList || [];
     MServiceList = MServiceList || [];
     if (MServiceList.length === 0) {
@@ -203,7 +204,7 @@ const mcRecver = new multicastRecver(constantes.getServerIpAddress(), constantes
     switch (message.type) {
         // Annonce d'une registry présente sur le réseau
         case constantes.MSMessageTypeEnum.regAnnonce:
-            traceMgr.debug('Recv Msg : regAnnonce : ', JSON.stringify(message));
+            traceMgr.info('Recv Msg : regAnnonce : ', JSON.stringify(message));
             regMgr.add(message.host, message.port);
             if (MServiceList.length === 0) {
                 findAvailableServices();
@@ -215,7 +216,7 @@ const mcRecver = new multicastRecver(constantes.getServerIpAddress(), constantes
             findAvailableServices();
             break;
         default:
-            traceMgr.warn('Recv Msg From : ' + address + ':' + port + ' - ' + JSON.stringify(message));
+            traceMgr.debug('Recv Msg From : ' + address + ':' + port + ' - ' + JSON.stringify(message));
             break;
     }
 });
