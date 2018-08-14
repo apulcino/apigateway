@@ -200,7 +200,7 @@ const SynchronizeComponentsList = function (newList) {
 //------------------------------------------------------------------------------
 // Se mettre à l'écoute des messages internes
 //------------------------------------------------------------------------------
-const mcRecver = new multicastRecver(constantes.getServerIpAddress(), constantes.MCastAppPort, constantes.MCastAppAddr, (address, port, message) => {
+const mcRecver = new multicastRecver(constantes.getServerIpAddress(), constantes.MCastAppPort, constantes.MCastAppAddr, constantes.getServerPublicIpAddress(), (address, port, message) => {
     switch (message.type) {
         // Annonce d'une registry présente sur le réseau
         case constantes.MSMessageTypeEnum.regAnnonce:
