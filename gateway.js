@@ -21,6 +21,12 @@ let MServiceList = [];
 //------------------------------------------------------------------------------
 router.use((req, res, next) => {
     try {
+        if (-1 !== req.url.indexOf('api-docs')) {
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.write(generateHTMLDocument(MServiceList));
+            res.end();
+            return;
+        }
         date += 1;
         // Rechercher le composant qui peut répondre à la demande
         let Srv = reRouteAPICall(req);
@@ -60,7 +66,7 @@ router.use((req, res, next) => {
 })
 
 //------------------------------------------------------------------------------
-// Vérifier si l'API invoquée est traité par un composant
+// Vérifier dans la table des composants si l'API invoquée est traité par un composant
 //------------------------------------------------------------------------------
 const reRouteAPICall = function (req) {
     // destCompo : {"type":"3","url":"http://158.50.163.7:3000","pathname":"/api/user","status":true,"cptr":331}
@@ -104,9 +110,13 @@ const reSendRequest = function (request, response, Srv, TRANSID, successCB, erro
     });
 }
 
-//------------------------------------------------------------------------------
-// Faire une Mise à jour de la liste des services
-//------------------------------------------------------------------------------
+/**
+ * ------------------------------------------------------------------------------
+ * Demander une Mise à jour de la liste des services (Composants)
+ *
+ * @api private
+ * ------------------------------------------------------------------------------
+ */
 const findAvailableServices = function () {
     // Demander la liste des annuaires connus
     let AFORegisteryUrlList = regMgr.getList();
@@ -132,10 +142,15 @@ const intervalObj = setInterval(() => {
     regMgr.checkRegistryStatus();
 }, 30000);
 
-//------------------------------------------------------------------------------
-// Supprimer le composant indiqué
-//------------------------------------------------------------------------------
-const removeComponentFromList = function (Srv) {
+/**
+ * ------------------------------------------------------------------------------
+ * Supprimer le composant indiqué dans le cache des composants
+ *
+ * @param {string} SrvRef référence du composant qui ne donne plus signe de vie
+ * @api private
+ * ------------------------------------------------------------------------------
+ */
+const removeComponentFromList = function (SrvRef) {
     MServiceList = MServiceList || [];
     let idx = MServiceList.findIndex((item) => {
         return (item.url === Srv.url);
@@ -221,5 +236,56 @@ const mcRecver = new multicastRecver(constantes.getServerIpAddress(), constantes
     }
 });
 
+/**
+ * ------------------------------------------------------------------------------
+ * Générer une vue HTML avec les liens SWAGGER
+ *
+ * @param {Object[]} newList - Liste des composants disponibles.
+ * @returns {string} Page html contenant la liste des liens SWAGGER
+ * ------------------------------------------------------------------------------
+ */
+const generateHTMLDocument = function (newList) {
+    newList = newList || [];
+    let viewArr = [
+        '<!DOCTYPE html>',
+        '<html>',
+        '<head>',
+        '<title>Coucou</title>',
+        '</head>',
+        '<body>',
+        generateHTMLView(newList),
+        '</body>',
+        '</html>'
+    ];
+    return viewArr.join('');
+}
+/**
+ * ------------------------------------------------------------------------------
+ * Générer une vue HTML avec les liens SWAGGER
+ *
+ * @param {Object[]} newList - Liste des composants disponibles.
+ * @returns {string} Page html contenant la liste des liens SWAGGER
+ * ------------------------------------------------------------------------------
+ */
+const generateHTMLView = function (newList) {
+    newList = newList || [];
+    let viewArr = [];
+    viewArr.push('<table id="linksTable">');
+    newList.forEach((value, index, array) => {
+        viewArr.push("<tr>");
+        viewArr.push('<td>' + value.pathname + ' : </td>');
+        viewArr.push('<td><a href="' + value.url + '/api-docs' + '">API description</a></td>');
+        viewArr.push("</tr>");
+    });
 
+    let AFORegisteryUrlList = regMgr.getList();
+    AFORegisteryUrlList.forEach((value, index, array) => {
+        viewArr.push("<tr>");
+        viewArr.push('<td>' + 'afoRegistry : ' + '</td>');
+        viewArr.push('<td><a href="' + value.regUrl + '/api-docs' + '">API description</a></td>');
+        viewArr.push("</tr>");
+    });
+    viewArr.push('</table>');
+    return viewArr.join('');
+}
 module.exports = router;
