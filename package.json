@@ -1,14 +1,15 @@
 {
   "name": "apigateway",
   "version": "1.0.0",
-  "description": "",
+  "description": "Gestionnaire d'API pour AFO V2",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "alfredo.pulcino@afp.com",
   "license": "ISC",
   "dependencies": {
+    "config": "^2.0.1",
     "express": "^4.16.3",
     "node-fetch": "^2.2.0"
   }

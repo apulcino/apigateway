@@ -14,6 +14,7 @@ const regMgr = new regsitryMgr(traceMgr);
 let date = (new Date()).getTime();
 // Liste des composant disponible sur le réseau
 let MServiceList = [];
+
 //------------------------------------------------------------------------------
 // Traitement des demandes vers AFPForum...
 //------------------------------------------------------------------------------
