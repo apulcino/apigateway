@@ -276,6 +276,7 @@ const generateHTMLView = function (newList) {
         viewArr.push("<tr>");
         viewArr.push('<td>' + value.pathname + ' : </td>');
         viewArr.push('<td><a href="' + value.url + '/api-docs' + '">API description</a></td>');
+        viewArr.push('<td>' + value.url + '/api-docs' + '</td>');
         viewArr.push("</tr>");
     });
 
@@ -284,6 +285,7 @@ const generateHTMLView = function (newList) {
         viewArr.push("<tr>");
         viewArr.push('<td>' + 'afoRegistry : ' + '</td>');
         viewArr.push('<td><a href="' + value.regUrl + '/api-docs' + '">API description</a></td>');
+        viewArr.push('<td>' + value.regUrl + '/api-docs' + '</td>');
         viewArr.push("</tr>");
     });
     viewArr.push('</table>');
