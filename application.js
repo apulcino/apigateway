@@ -1,3 +1,4 @@
+"strict mode"
 const config = require('config');
 const express = require('express');
 const application = express();
