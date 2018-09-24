@@ -68,9 +68,10 @@ router.use((req, res, next) => {
 
 //------------------------------------------------------------------------------
 // Vérifier dans la table des composants si l'API invoquée est traité par un composant
+// destCompo : {"type":"3","url":"http://158.50.163.7:3000","pathname":"/api/user","status":true,"cptr":331}
 //------------------------------------------------------------------------------
 const reRouteAPICall = function (req) {
-    // destCompo : {"type":"3","url":"http://158.50.163.7:3000","pathname":"/api/user","status":true,"cptr":331}
+    regMgr.Resolve(req.url);
     var destCompo = constantes.findActiveMService(MServiceList, req.url);
     if (destCompo) {
         traceMgr.info('Route API call to : ', destCompo.url);
