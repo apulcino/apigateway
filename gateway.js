@@ -22,12 +22,14 @@ let MServiceList = [];
 //------------------------------------------------------------------------------
 router.use((req, res, next) => {
     try {
-        if (-1 !== req.url.indexOf('api-docs')) {
-            res.writeHead(200, { 'Content-Type': 'text/html' });
-            res.write(generateHTMLDocument(MServiceList));
-            res.end();
-            return;
-        }
+        // if (-1 !== req.url.indexOf('api-docs')) {
+        //     res.writeHead(200, { 'Content-Type': 'text/html' });
+        //     res.write(generateHTMLDocument(MServiceList));
+        //     res.end();
+        //     return;
+        // }
+
+        traceMgr.info('Route API call to : ', req.url);
         date += 1;
         // Rechercher le composant qui peut répondre à la demande
         let Srv = reRouteAPICall(req);
@@ -238,58 +240,4 @@ const mcRecver = new multicastRecver(constantes.getServerIpAddress(), constantes
     }
 });
 
-/**
- * ------------------------------------------------------------------------------
- * Générer une vue HTML avec les liens SWAGGER
- *
- * @param {Object[]} newList - Liste des composants disponibles.
- * @returns {string} Page html contenant la liste des liens SWAGGER
- * ------------------------------------------------------------------------------
- */
-const generateHTMLDocument = function (newList) {
-    newList = newList || [];
-    let viewArr = [
-        '<!DOCTYPE html>',
-        '<html>',
-        '<head>',
-        '<title>Coucou</title>',
-        '</head>',
-        '<body>',
-        generateHTMLView(newList),
-        '</body>',
-        '</html>'
-    ];
-    return viewArr.join('');
-}
-/**
- * ------------------------------------------------------------------------------
- * Générer une vue HTML avec les liens SWAGGER
- *
- * @param {Object[]} newList - Liste des composants disponibles.
- * @returns {string} Page html contenant la liste des liens SWAGGER
- * ------------------------------------------------------------------------------
- */
-const generateHTMLView = function (newList) {
-    newList = newList || [];
-    let viewArr = [];
-    viewArr.push('<table id="linksTable">');
-    newList.forEach((value, index, array) => {
-        viewArr.push("<tr>");
-        viewArr.push('<td>' + value.pathname + ' : </td>');
-        viewArr.push('<td><a href="' + value.url + '/api-docs' + '">API description</a></td>');
-        viewArr.push('<td>' + value.url + '/api-docs' + '</td>');
-        viewArr.push("</tr>");
-    });
-
-    let AFORegisteryUrlList = regMgr.getList();
-    AFORegisteryUrlList.forEach((value, index, array) => {
-        viewArr.push("<tr>");
-        viewArr.push('<td>' + 'afoRegistry : ' + '</td>');
-        viewArr.push('<td><a href="' + value.regUrl + '/api-docs' + '">API description</a></td>');
-        viewArr.push('<td>' + value.regUrl + '/api-docs' + '</td>');
-        viewArr.push("</tr>");
-    });
-    viewArr.push('</table>');
-    return viewArr.join('');
-}
 module.exports = router;
