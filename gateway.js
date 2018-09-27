@@ -5,10 +5,12 @@ const constantes = require('../library/constantes');
 const traceMgr = new (require('../library/tracemgr'))('APIGateway');
 const multicastRecver = require('../library/multicastRecver');
 const regsitryMgr = require('../library/registryMgr');
+const consulMgr = require('../library/consulMgr').consulMgr;
 
 const http = require('http');
 const express = require('express');
 const router = express.Router();
+var httpProxy = require('http-proxy');
 
 const regMgr = new regsitryMgr(traceMgr);
 let date = (new Date()).getTime();
@@ -18,27 +20,41 @@ let MServiceList = [];
 //------------------------------------------------------------------------------
 // Traitement des demandes vers AFPForum...
 //------------------------------------------------------------------------------
-// http://localhost:8080/afpforum
+// http://localhost:8080/afpforum/...
+// result : {
+//     "address":"158.50.163.7",
+//     "id":"authent-v1_51102",
+//     "name":"authent-v1",
+//     "port":51102,
+//     "realUrl":"http://158.50.163.7:51102/api/v1/user/login",
+//     "url":"http://158.50.163.7:51102"
+// }
 //------------------------------------------------------------------------------
 router.use((req, res, next) => {
-    try {
-        // if (-1 !== req.url.indexOf('api-docs')) {
-        //     res.writeHead(200, { 'Content-Type': 'text/html' });
-        //     res.write(generateHTMLDocument(MServiceList));
-        //     res.end();
-        //     return;
-        // }
+    // Rechercher le composant qui peut répondre à la demande
+    consulMgr.Resolve(req.url,
+        (err) => {
 
-        traceMgr.info('Route API call to : ', req.url);
+        },
+        (Srv) => {
+            routeCallToService(Srv, req, res, next)
+        });
+})
+//------------------------------------------------------------------------------
+// http://localhost:8080/afpforum/...
+//------------------------------------------------------------------------------
+function routeCallToService(Srv, req, res, next) {
+    try {
         date += 1;
         // Rechercher le composant qui peut répondre à la demande
-        let Srv = reRouteAPICall(req);
+        // let Srv = reRouteAPICall(req);
         if (Srv) {
+            traceMgr.info('Route API call to : ' + Srv.url + Srv.realUrl);
             // Ajouter les headers
             var TRANSID = 'XAFP_' + date;
             res.set('XAFP-TRANSID', TRANSID);
-            res.set('XAFP-SOURCE', Srv.url);
-            // PRoxification de la dermande
+            res.set('XAFP-SOURCE', req.url);
+            // Proxification de la dermande
             reSendRequest(req, res, Srv, TRANSID,
                 null,
                 (err) => {
@@ -48,7 +64,7 @@ router.use((req, res, next) => {
                         isSuccess: false,
                         message: err.message
                     });
-                    removeComponentFromList(Srv);
+                    // removeComponentFromList(Srv);
                 });
         } else {
             // Aucun composant ne sait traiter cette demande
@@ -66,34 +82,52 @@ router.use((req, res, next) => {
             message: err.message
         });
     }
-})
-
+}
 //------------------------------------------------------------------------------
 // Vérifier dans la table des composants si l'API invoquée est traité par un composant
 // destCompo : {"type":"3","url":"http://158.50.163.7:3000","pathname":"/api/user","status":true,"cptr":331}
+// result : {
+//     "address":"158.50.163.7",
+//     "id":"authent-v1_51102",
+//     "name":"authent-v1",
+//     "port":51102,
+//     "realUrl":"http://158.50.163.7:51102/api/v1/user/login",
+//     "url":"http://158.50.163.7:51102"
+// }
 //------------------------------------------------------------------------------
-const reRouteAPICall = function (req) {
-    regMgr.Resolve(req.url);
-    var destCompo = constantes.findActiveMService(MServiceList, req.url);
-    if (destCompo) {
-        traceMgr.info('Route API call to : ', destCompo.url);
-    }
-    return destCompo;
-}
+// const reRouteAPICall = function (req, cbError, cbSuccess) {
+//     consulMgr.Resolve(req.url,
+//         (err) => { cbError(err); },
+//         (result) => { cbSuccess(result); });
+//     // var destCompo = constantes.findActiveMService(MServiceList, req.url);
+//     // if (destCompo) {
+//     //     traceMgr.info('Route API call to : ', destCompo.url);
+//     // }
+//     // return destCompo;
+// }
 //------------------------------------------------------------------------------
 // forwarder la requête vers le serveur qui héberge le composant
+// Srv : {
+//     "address":"158.50.163.7",
+//     "id":"authent-v1_51102",
+//     "name":"authent-v1",
+//     "port":51102,
+//     "realUrl":"http://158.50.163.7:51102/api/v1/user/login",
+//     "url":"http://158.50.163.7:51102"
+// }
 //------------------------------------------------------------------------------
 const reSendRequest = function (request, response, Srv, TRANSID, successCB, errorCB) {
     successCB = successCB || function () { };
     errorCB = errorCB || function () { };
     var myHeaders = request.headers;
     myHeaders['XAFP-TRANSID'] = TRANSID;
-    var proxy = http.createClient(Srv.port, Srv.host)
+    myHeaders['content-type'] = "application/json"
+    var proxy = http.createClient(Srv.port, Srv.address)
     proxy.on('error', function (err) {
         // Handle error
         errorCB(err);
     });
-    var proxy_request = proxy.request(request.method, request.url, myHeaders);
+    var proxy_request = proxy.request(request.method, Srv.realUrl, myHeaders);
     proxy_request.addListener('response', function (proxy_response) {
         proxy_response.addListener('data', function (chunk) {
             response.write(chunk, 'binary');
