@@ -10,7 +10,6 @@ const consulMgr = require('../library/consulMgr').consulMgr;
 const http = require('http');
 const express = require('express');
 const router = express.Router();
-var httpProxy = require('http-proxy');
 
 const regMgr = new regsitryMgr(traceMgr);
 let date = (new Date()).getTime();
