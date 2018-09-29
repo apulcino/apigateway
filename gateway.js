@@ -10,12 +10,18 @@ const consulMgr = require('../library/consulMgr').consulMgr;
 const http = require('http');
 const express = require('express');
 const router = express.Router();
-
+const forward = require('http-forward');
 const regMgr = new regsitryMgr(traceMgr);
 let date = (new Date()).getTime();
-// Liste des composant disponible sur le réseau
-let MServiceList = [];
 
+//------------------------------------------------------------------------------
+// Authentication
+//------------------------------------------------------------------------------
+router.use((req, res, next) => {
+    // TODO: my authentication logic
+    traceMgr.debug('Check authentification...');
+    next()
+})
 //------------------------------------------------------------------------------
 // Traitement des demandes vers AFPForum...
 //------------------------------------------------------------------------------
@@ -25,7 +31,7 @@ let MServiceList = [];
 //     "id":"authent-v1_51102",
 //     "name":"authent-v1",
 //     "port":51102,
-//     "realUrl":"http://158.50.163.7:51102/api/v1/user/login",
+//     "realUrl":"api/v1/user/login",
 //     "url":"http://158.50.163.7:51102"
 // }
 //------------------------------------------------------------------------------
@@ -33,10 +39,10 @@ router.use((req, res, next) => {
     // Rechercher le composant qui peut répondre à la demande
     consulMgr.Resolve(req.url,
         (err) => {
-
+            traceMgr.error('Error : ', err);
         },
         (Srv) => {
-            routeCallToService(Srv, req, res, next)
+            routeCallToService(Srv, req, res, next);
         });
 })
 //------------------------------------------------------------------------------
@@ -46,13 +52,10 @@ function routeCallToService(Srv, req, res, next) {
     try {
         date += 1;
         // Rechercher le composant qui peut répondre à la demande
-        // let Srv = reRouteAPICall(req);
         if (Srv) {
             traceMgr.info('Route API call to : ' + Srv.url + Srv.realUrl);
             // Ajouter les headers
             var TRANSID = 'XAFP_' + date;
-            res.set('XAFP-TRANSID', TRANSID);
-            res.set('XAFP-SOURCE', req.url);
             // Proxification de la dermande
             reSendRequest(req, res, Srv, TRANSID,
                 null,
@@ -83,28 +86,6 @@ function routeCallToService(Srv, req, res, next) {
     }
 }
 //------------------------------------------------------------------------------
-// Vérifier dans la table des composants si l'API invoquée est traité par un composant
-// destCompo : {"type":"3","url":"http://158.50.163.7:3000","pathname":"/api/user","status":true,"cptr":331}
-// result : {
-//     "address":"158.50.163.7",
-//     "id":"authent-v1_51102",
-//     "name":"authent-v1",
-//     "port":51102,
-//     "realUrl":"http://158.50.163.7:51102/api/v1/user/login",
-//     "url":"http://158.50.163.7:51102"
-// }
-//------------------------------------------------------------------------------
-// const reRouteAPICall = function (req, cbError, cbSuccess) {
-//     consulMgr.Resolve(req.url,
-//         (err) => { cbError(err); },
-//         (result) => { cbSuccess(result); });
-//     // var destCompo = constantes.findActiveMService(MServiceList, req.url);
-//     // if (destCompo) {
-//     //     traceMgr.info('Route API call to : ', destCompo.url);
-//     // }
-//     // return destCompo;
-// }
-//------------------------------------------------------------------------------
 // forwarder la requête vers le serveur qui héberge le composant
 // Srv : {
 //     "address":"158.50.163.7",
@@ -115,138 +96,18 @@ function routeCallToService(Srv, req, res, next) {
 //     "url":"http://158.50.163.7:51102"
 // }
 //------------------------------------------------------------------------------
-const reSendRequest = function (request, response, Srv, TRANSID, successCB, errorCB) {
+const reSendRequest = function (req, res, Srv, TRANSID, successCB, errorCB) {
     successCB = successCB || function () { };
     errorCB = errorCB || function () { };
-    var myHeaders = request.headers;
-    myHeaders['XAFP-TRANSID'] = TRANSID;
-    myHeaders['content-type'] = "application/json"
-    var proxy = http.createClient(Srv.port, Srv.address)
-    proxy.on('error', function (err) {
-        // Handle error
-        errorCB(err);
+    res.set('XAFP-TRANSID', TRANSID);
+    res.set('XAFP-SOURCE', req.url);
+    req.headers['XAFP-TRANSID'] = TRANSID;
+    req.headers['content-type'] = "application/json"
+    req.url = Srv.realUrl;
+    req.forward = { target: Srv.url }
+    forward(req, res, (err, res) => {
+        traceMgr.debug('Forwarded Msg to : ', req.url);
     });
-    var proxy_request = proxy.request(request.method, Srv.realUrl, myHeaders);
-    proxy_request.addListener('response', function (proxy_response) {
-        proxy_response.addListener('data', function (chunk) {
-            response.write(chunk, 'binary');
-        });
-        proxy_response.addListener('end', function () {
-            Srv.cptr += 1;
-            response.end();
-        });
-        response.writeHead(proxy_response.statusCode, proxy_response.headers);
-    });
-
-    request.addListener('data', function (chunk) {
-        proxy_request.write(chunk, 'binary');
-    });
-
-    request.addListener('end', function () {
-        proxy_request.end();
-    });
-}
-
-/**
- * ------------------------------------------------------------------------------
- * Demander une Mise à jour de la liste des services (Composants)
- *
- * @api private
- * ------------------------------------------------------------------------------
- */
-const findAvailableServices = function () {
-    // Demander la liste des annuaires connus
-    let AFORegisteryUrlList = regMgr.getList();
-    if (0 !== AFORegisteryUrlList.length) {
-        // returns a random integer from 0 to AFORegisteryUrlList.length - 1
-        let idx = Math.floor(Math.random() * AFORegisteryUrlList.length);
-        // Demander a l'un des annuaires de la liste des composant disponibles sur le réseau
-        constantes.getServiceList(traceMgr, AFORegisteryUrlList[idx]).then(data => {
-            // Réception de la nouvelle liste de composants
-            SynchronizeComponentsList(data);
-        }).catch((AFORegisteryUrlWithError) => {
-            // Indiquer que cet annuaire n'est pas fiable...
-            regMgr.error(AFORegisteryUrlWithError);
-        });
-    }
-}
-//------------------------------------------------------------------------------
-// Demander à la Registry la liste des services disponibles maintenant puis toutes
-// les 10 secondes
-//------------------------------------------------------------------------------
-findAvailableServices();
-const intervalObj = setInterval(() => {
-    regMgr.checkRegistryStatus();
-}, 30000);
-
-/**
- * ------------------------------------------------------------------------------
- * Supprimer le composant indiqué dans le cache des composants
- *
- * @param {string} SrvRef référence du composant qui ne donne plus signe de vie
- * @api private
- * ------------------------------------------------------------------------------
- */
-const removeComponentFromList = function (SrvRef) {
-    MServiceList = MServiceList || [];
-    let idx = MServiceList.findIndex((item) => {
-        return (item.url === Srv.url);
-    });
-    if (-1 !== idx) {
-        MServiceList.splice(idx, 1);
-    }
-    if (0 === MServiceList.length) {
-        traceMgr.error('No component available');
-    }
-}
-//------------------------------------------------------------------------------
-// Synchroniser la nelle liste de composants (newList) avec la courante MServiceList
-// newList = [
-//     {"type":"1","url":"http://158.50.163.7:59095","host":"158.50.163.7","port":"59095","pathname":"/api/events","status":true,"cptr":861},
-//     {"type":"1","url":"http://158.50.163.7:63715","host":"158.50.163.7","port":"63715","pathname":"/api/events","status":true,"cptr":385}
-// ]
-//------------------------------------------------------------------------------
-const SynchronizeComponentsList = function (newList) {
-    newList = newList || [];
-    MServiceList = MServiceList || [];
-    if (MServiceList.length === 0) {
-        for (let i = 0; i < newList.length; i++) {
-            newList[i].cptr = 0;
-        }
-        MServiceList = newList;
-        return;
-    }
-    //------------------------------------------------------------------------------
-    // Ajouter les nouveaux composants
-    //------------------------------------------------------------------------------
-    for (let i = 0; i < newList.length; i++) {
-        var found = MServiceList.find(function (element) {
-            return (element.url === newList[i].url);
-        });
-        // C'est un nouveau, on l'ajoute à la liste
-        if (!found) {
-            newList[i].cptr = 0;
-            MServiceList.push(newList[i]);
-        }
-    }
-    //------------------------------------------------------------------------------
-    // Marquer les composants qui ont disparus (url <- '')
-    //------------------------------------------------------------------------------
-    for (let j = 0; j < MServiceList.length; j++) {
-        var found = newList.find(function (element) {
-            return (element.url === MServiceList[j].url);
-        });
-        // Le composant n'est plus disponbible
-        if (!found) {
-            // Marquer le composant pour le supprimer
-            MServiceList[j].url = '';
-        }
-    }
-    //------------------------------------------------------------------------------
-    // Supprimer les composants marqués
-    //------------------------------------------------------------------------------
-    MServiceList = MServiceList.filter(Srv => Srv.url.length !== 0);
-    return MServiceList;
 }
 
 //------------------------------------------------------------------------------
@@ -268,7 +129,7 @@ const mcRecver = new multicastRecver(constantes.getServerIpAddress(), constantes
             findAvailableServices();
             break;
         default:
-            traceMgr.debug('Recv Msg From : ' + address + ':' + port + ' - ' + JSON.stringify(message));
+            //traceMgr.debug('Recv Msg From : ' + address + ':' + port + ' - ' + JSON.stringify(message));
             break;
     }
 });
