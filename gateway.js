@@ -113,25 +113,25 @@ const reSendRequest = function (req, res, Srv, TRANSID, successCB, errorCB) {
 //------------------------------------------------------------------------------
 // Se mettre à l'écoute des messages internes
 //------------------------------------------------------------------------------
-const mcRecver = new multicastRecver(constantes.getServerIpAddress(), constantes.MCastAppPort, constantes.MCastAppAddr, constantes.getServerPublicIpAddress(), (address, port, message) => {
-    switch (message.type) {
-        // Annonce d'une registry présente sur le réseau
-        case constantes.MSMessageTypeEnum.regAnnonce:
-            traceMgr.info('Recv Msg : regAnnonce : ', JSON.stringify(message));
-            regMgr.add(message.host, message.port);
-            if (MServiceList.length === 0) {
-                findAvailableServices();
-            }
-            break;
-        // Annonce d'une mise à jour de registry
-        case constantes.MSMessageTypeEnum.regUpdate:
-            traceMgr.info('Recv Msg : regUpdate');
-            findAvailableServices();
-            break;
-        default:
-            //traceMgr.debug('Recv Msg From : ' + address + ':' + port + ' - ' + JSON.stringify(message));
-            break;
-    }
-});
+// const mcRecver = new multicastRecver(constantes.getServerIpAddress(), constantes.MCastAppPort, constantes.MCastAppAddr, constantes.getServerPublicIpAddress(), (address, port, message) => {
+//     switch (message.type) {
+//         // Annonce d'une registry présente sur le réseau
+//         case constantes.MSMessageTypeEnum.regAnnonce:
+//             traceMgr.info('Recv Msg : regAnnonce : ', JSON.stringify(message));
+//             regMgr.add(message.host, message.port);
+//             if (MServiceList.length === 0) {
+//                 findAvailableServices();
+//             }
+//             break;
+//         // Annonce d'une mise à jour de registry
+//         case constantes.MSMessageTypeEnum.regUpdate:
+//             traceMgr.info('Recv Msg : regUpdate');
+//             findAvailableServices();
+//             break;
+//         default:
+//             //traceMgr.debug('Recv Msg From : ' + address + ':' + port + ' - ' + JSON.stringify(message));
+//             break;
+//     }
+// });
 
 module.exports = router;
