@@ -3,7 +3,7 @@
 //------------------------------------------------------------------------------
 const constantes = require('../library/constantes');
 const traceMgr = new (require('../library/tracemgr'))('APIGateway');
-const multicastRecver = require('../library/multicastRecver');
+//const multicastRecver = require('../library/multicastRecver');
 const regsitryMgr = require('../library/registryMgr');
 const consulMgr = require('../library/consulMgr').consulMgr;
 
@@ -41,23 +41,22 @@ router.use((req, res, next) => {
         (err) => {
             traceMgr.error('Error : ', err);
         },
-        (Srv) => {
-            routeCallToService(Srv, req, res, next);
+        (SrvArray) => {
+            routeCallToService(SrvArray, req, res, next);
         });
 })
 //------------------------------------------------------------------------------
 // http://localhost:8080/afpforum/...
 //------------------------------------------------------------------------------
-function routeCallToService(Srv, req, res, next) {
+function routeCallToService(SrvArray, req, res, next) {
     try {
         date += 1;
         // Rechercher le composant qui peut répondre à la demande
-        if (Srv) {
-            traceMgr.info('Route API call to : ' + Srv.url + Srv.realUrl);
+        if (SrvArray.length != 0) {
             // Ajouter les headers
             var TRANSID = 'XAFP_' + date;
             // Proxification de la dermande
-            reSendRequest(req, res, Srv, TRANSID,
+            reSendRequest(req, res, SrvArray, TRANSID,
                 null,
                 (err) => {
                     // Le composant visé ne répond pas...
@@ -96,17 +95,27 @@ function routeCallToService(Srv, req, res, next) {
 //     "url":"http://158.50.163.7:51102"
 // }
 //------------------------------------------------------------------------------
-const reSendRequest = function (req, res, Srv, TRANSID, successCB, errorCB) {
+const reSendRequest = function (req, res, SrvArray, TRANSID, successCB, errorCB) {
     successCB = successCB || function () { };
     errorCB = errorCB || function () { };
     res.set('XAFP-TRANSID', TRANSID);
     res.set('XAFP-SOURCE', req.url);
     req.headers['XAFP-TRANSID'] = TRANSID;
     req.headers['content-type'] = "application/json"
+
+    // Il faut implementer le pattern circuit breaker...
+    let Srv = SrvArray.pop();
+    traceMgr.info('Route API call to : ' + Srv.url + Srv.realUrl);
+    res.set('XAFP-HOST-SOURCE', Srv.url);
     req.url = Srv.realUrl;
     req.forward = { target: Srv.url }
     forward(req, res, (err, res) => {
-        traceMgr.debug('Forwarded Msg to : ', req.url);
+        if (err) {
+            traceMgr.error('Error forwarding Msg to : ', req.url);
+        } else {
+            traceMgr.debug('Forwarded Msg to : ', req.url);
+            return;
+        }
     });
 }
 
