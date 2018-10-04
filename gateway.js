@@ -37,9 +37,15 @@ router.use((req, res, next) => {
 //------------------------------------------------------------------------------
 router.use((req, res, next) => {
     // Rechercher le composant qui peut répondre à la demande
-    consulMgr.Resolve(req.url,
+    consulMgr.Resolve(traceMgr, req.url,
         (err) => {
             traceMgr.error('Error : ', err);
+            // Aucun composant ne sait traiter cette demande
+            res.set('XAFP-SOURCE', 'Service_Unavailable');
+            res.status(400).json({
+                isSuccess: false,
+                message: 'api not available'
+            });
         },
         (SrvArray) => {
             routeCallToService(SrvArray, req, res, next);
@@ -104,7 +110,7 @@ const reSendRequest = function (req, res, SrvArray, TRANSID, successCB, errorCB)
     req.headers['content-type'] = "application/json"
 
     // Il faut implementer le pattern circuit breaker...
-    let Srv = SrvArray.pop();
+    let Srv = SrvArray[Math.floor(Math.random() * SrvArray.length)];
     traceMgr.info('Route API call to : ' + Srv.url + Srv.realUrl);
     res.set('XAFP-HOST-SOURCE', Srv.url);
     req.url = Srv.realUrl;
