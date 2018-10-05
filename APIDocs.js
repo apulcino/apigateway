@@ -8,18 +8,11 @@ const router = express.Router();
 const consulMgr = require('../library/consulMgr').consulMgr;
 
 //------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
-let registryUrl = '/afpforum';
-if (config.has('Components.APIGateway.registry')) {
-    registryUrl = config.get('Components.APIGateway.registry');
-}
-
-//------------------------------------------------------------------------------
 // http://localhost:8080/api-docs
 // Utiliser l'url : http://127.0.0.1:8500/v1/agent/services
 //------------------------------------------------------------------------------
 router.get('/', (req, res) => {
-    consulMgr.GetAllHealthyServices(
+    consulMgr.GetAllServices(
         (err) => {
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.write(err);

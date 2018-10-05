@@ -112,7 +112,6 @@ const reSendRequest = function (req, res, SrvArray, TRANSID, successCB, errorCB)
     // Il faut implementer le pattern circuit breaker...
     let Srv = SrvArray[Math.floor(Math.random() * SrvArray.length)];
     traceMgr.info('Route API call to : ' + Srv.url + Srv.realUrl);
-    res.set('XAFP-HOST-SOURCE', Srv.url);
     req.url = Srv.realUrl;
     req.forward = { target: Srv.url }
     forward(req, res, (err, res) => {
