@@ -37,7 +37,8 @@ router.use((req, res, next) => {
 //------------------------------------------------------------------------------
 router.use((req, res, next) => {
     // Rechercher le composant qui peut répondre à la demande
-    consulMgr.Resolve(traceMgr, req.url,
+    console.log('req.url : ' + req.headers.host);
+    consulMgr.Resolve(traceMgr, req.headers.host, req.url,
         (err) => {
             traceMgr.error('Error : ', err);
             // Aucun composant ne sait traiter cette demande
@@ -111,7 +112,7 @@ const reSendRequest = function (req, res, SrvArray, TRANSID, successCB, errorCB)
 
     // Il faut implementer le pattern circuit breaker...
     let Srv = SrvArray[Math.floor(Math.random() * SrvArray.length)];
-    traceMgr.info('Route API call to : ' + Srv.url + Srv.realUrl);
+    traceMgr.info('Route API call to : ' + Srv.realUrl);
     req.url = Srv.realUrl;
     req.forward = { target: Srv.url }
     forward(req, res, (err, res) => {

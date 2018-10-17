@@ -16,9 +16,11 @@ const apiHealthRoutes = require('./APIHealth');
 application.use(constantes.MSPathnameEnum.afoHealth, apiHealthRoutes);
 
 // Gestion de la route vers : http://localhost:8080/afpforum/...
-let rootRoute = '/afpforum';
+// let rootRoute = '/afpforum';
+let rootRoute = '';
 if (config.has('Components.APIGateway.rootRoute')) {
     rootRoute = config.get('Components.APIGateway.rootRoute');
 }
 application.use(rootRoute, apiRegistryRoutes);
+
 module.exports = application;
